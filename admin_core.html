@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>ADMIN_CORE</title>
+    <style>
+        :root { --red: #ff3333; --gold: #FFD700; }
+        body { background: #000; color: var(--gold); font-family: 'Courier New', monospace; overflow: hidden; transition: 0.1s; }
+        .wrapper { display: grid; grid-template-columns: 250px 1fr; height: 100vh; padding: 10px; gap: 10px; }
+        .panel { border: 1px solid var(--red); padding: 20px; background: rgba(20,0,0,0.8); }
+        
+        .fenix { width: 60px; height: 60px; margin: 0 auto 20px; transition: 0.3s; }
+        .pulse { animation: p 2s infinite; color: var(--gold); }
+        .panic-fenix { animation: panic-p 0.2s infinite !important; color: var(--red) !important; filter: drop-shadow(0 0 15px var(--red)); }
+        
+        @keyframes p { 50% { filter: drop-shadow(0 0 10px var(--gold)); } }
+        @keyframes panic-p { 0% { transform: scale(1.2); } 100% { transform: scale(1); } }
+
+        /* Screen Shake */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            50% { transform: translate(-1px, 2px) rotate(1deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+        .shake-active { animation: shake 0.3s infinite; background: #300 !important; }
+
+        input { width: 100%; background: transparent; border: 1px solid var(--red); color: var(--red); padding: 10px; outline: none; }
+    </style>
+</head>
+<body>
+    <div class="wrapper" id="main-ui">
+        <aside class="panel">
+            <svg class="fenix pulse" id="logo"><use xlink:href="#f"></use></svg>
+            <div style="font-size:12px; text-align:center;">SYSTEM_STATUS: OK</div>
+        </aside>
+        <main class="panel">
+            <h2>ADMIN_CENTRAL</h2>
+            <div id="logs" style="height:300px; overflow:hidden; font-size:10px; opacity:0.6;">[OK] Protocols active...</div>
+            <input type="text" id="cmd" placeholder="ENTER COMMAND (try 'panic')">
+        </main>
+    </div>
+
+    <svg style="display:none;"><symbol id="f" viewBox="0 0 100 100"><path d="M50 10 L40 30 L20 25 L35 45 L15 55 L40 60 L50 90 L60 60 L85 55 L65 45 L80 25 L60 30 Z" fill="currentColor"/></symbol></svg>
+
+    <script>
+        const cmd = document.getElementById('cmd');
+        const ui = document.getElementById('main-ui');
+        const logo = document.getElementById('logo');
+
+        cmd.onkeypress = (e) => {
+            if(e.key === 'Enter') {
+                if(cmd.value.toLowerCase() === 'panic') {
+                    ui.classList.add('shake-active');
+                    logo.classList.add('panic-fenix');
+                    document.getElementById('logs').innerHTML = "<div style='color:red;'>[ALERT] SELF_DESTRUCT_SEQUENCE_INITIATED!</div>" + document.getElementById('logs').innerHTML;
+                    setTimeout(() => {
+                        ui.classList.remove('shake-active');
+                        logo.classList.remove('panic-fenix');
+                    }, 5000);
+                }
+                cmd.value = "";
+            }
+        };
+    </script>
+</body>
+</html>

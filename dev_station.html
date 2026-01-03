@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>DEV_STATION</title>
+    <style>
+        body { background: #030303; color: #00e5ff; font-family: 'Courier New', monospace; padding: 20px; }
+        .panel { border: 1px solid #00e5ff; padding: 20px; background: rgba(0, 229, 255, 0.05); }
+        .cursor { display: inline-block; width: 10px; height: 1.2em; background: #00e5ff; animation: b 1s infinite; }
+        @keyframes b { 50% { opacity: 0; } }
+    </style>
+</head>
+<body>
+    <div class="panel">
+        <h2>> DEV_ENVIRONMENT_ACTIVE</h2>
+        <div id="term">root@fenix_dev:~$ npm run start_v40...<br></div>
+        <span class="cursor"></span>
+    </div>
+    <button onclick="location.href='index.html'" style="margin-top:20px; background:transparent; border:1px solid #00e5ff; color:#00e5ff; cursor:pointer;">DISCONNECT</button>
+</body>
+</html>

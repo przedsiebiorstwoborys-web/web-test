@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>FENIX_COMMAND_CENTER_V40</title>
+    <style>
+        :root { --gold: #FFD700; --blue: #00e5ff; --red: #ff3333; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Courier New', monospace; color: var(--gold); }
+        #matrix-canvas { position: fixed; top: 0; left: 0; z-index: 1; opacity: 0.15; }
+        
+        #login-screen { position: fixed; z-index: 2000; top: 0; left: 0; width: 100%; height: 100%; background: #000; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+        .login-box { width: 500px; padding: 50px; border: 1px solid var(--gold); background: rgba(5,5,5,0.98); text-align: center; box-shadow: 0 0 30px rgba(255, 215, 0, 0.2); z-index: 2001; transition: 0.4s; }
+        .lockdown-active { border-color: var(--red) !important; box-shadow: 0 0 50px var(--red) !important; }
+
+        .fenix-logo { width: 80px; height: 80px; margin-bottom: 20px; animation: pulse 3s infinite; cursor: pointer; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); filter: drop-shadow(0 0 5px var(--gold)); } 50% { transform: scale(1.1); filter: drop-shadow(0 0 20px var(--gold)); } }
+
+        /* SZEROKI I WYSOKI PASEK POSTĘPU */
+        .progress-bar { 
+            width: 100%; 
+            height: 16px; 
+            border: 1px solid rgba(255, 215, 0, 0.4); 
+            margin: 35px 0; 
+            background: rgba(255, 215, 0, 0.05);
+            position: relative;
+            overflow: hidden;
+        }
+        .fill { 
+            height: 100%; 
+            width: 0%; 
+            background: var(--gold); 
+            transition: 1s cubic-bezier(0.4, 0, 0.2, 1); 
+            box-shadow: 0 0 20px var(--gold);
+            position: relative;
+        }
+        .fill::after {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            animation: scan 2s infinite;
+        }
+        @keyframes scan { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+
+        .main-btn { background: transparent; border: 1px solid var(--gold); color: var(--gold); padding: 15px 30px; font-family: inherit; letter-spacing: 3px; cursor: pointer; transition: 0.3s; width: 100%; margin-top: 10px; }
+        .main-btn:hover:not(:disabled) { background: var(--gold); color: #000; box-shadow: 0 0 20px var(--gold); }
+        .auth-input { background: rgba(255,215,0,0.05); border: none; border-bottom: 2px solid var(--gold); color: var(--gold); width: 100%; text-align: center; font-size: 24px; outline: none; letter-spacing: 8px; padding: 10px; }
+        
+        #portal-screen { position: relative; z-index: 10; width: 100vw; height: 100vh; display: none; align-items: center; justify-content: center; gap: 30px; }
+        .card { width: 300px; height: 400px; border: 1px solid; background: rgba(5,5,5,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: 0.4s; }
+        .card.gold { border-color: var(--gold); color: var(--gold); }
+        .card.blue { border-color: var(--blue); color: var(--blue); }
+        .card:hover { transform: translateY(-10px); box-shadow: 0 0 25px currentColor; }
+        #reg-tool { display: none; position: fixed; bottom: 20px; right: 20px; background: #111; border: 1px solid var(--blue); padding: 15px; z-index: 3000; font-size: 10px; color: var(--blue); }
+    </style>
+</head>
+<body>
+    <canvas id="matrix-canvas"></canvas>
+    <audio id="beep-success" src="https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3"></audio>
+    <audio id="alarm-lock" src="https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3"></audio>
+
+    <svg style="display:none;"><symbol id="fenix" viewBox="0 0 100 100"><path d="M50 10 L40 30 L20 25 L35 45 L15 55 L40 60 L50 90 L60 60 L85 55 L65 45 L80 25 L60 30 Z" fill="currentColor"/></symbol></svg>
+
+    <div id="login-screen">
+        <div class="login-box" id="l-box">
+            <svg class="fenix-logo" onclick="openReg()"><use xlink:href="#fenix"></use></svg>
+            <div id="status">INIT_SEQUENCE</div>
+            <div class="progress-bar"><div id="main-fill" class="fill"></div></div>
+            
+            <div id="auth-flow">
+                <button id="start-btn" onclick="activateAuth()" class="main-btn">INITIALIZE_HANDSHAKE</button>
+                <div id="input-area" style="display:none;">
+                    <input type="password" id="pass" class="auth-input" placeholder="********">
+                </div>
+                <div id="yubico-area" style="display:none; margin-top: 10px;">
+                    <button id="scan-btn" onclick="executeHardwareScan()" class="main-btn" style="border-color:var(--blue); color:var(--blue);">SCAN_YUBIKEY_NOW</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="reg-tool">
+        <strong>ADMIN_KEY_GEN</strong><br>
+        <button onclick="registerKey()" style="background:transparent; color:var(--blue); border:1px solid var(--blue); cursor:pointer; margin-top:5px;">GENERATE_ID</button>
+        <div id="reg-log" style="margin-top:10px; white-space: pre-wrap; font-size:9px;"></div>
+    </div>
+
+    <div id="portal-screen">
+        <div class="card gold" onclick="window.location.href='admin_core.html'"><svg width="80" height="80"><use xlink:href="#fenix"></use></svg><h2>ADMIN_CORE</h2></div>
+        <div class="card blue" onclick="window.location.href='dev_station.html'"><svg width="80" height="80" style="color:var(--blue)"><use xlink:href="#fenix"></use></svg><h2>DEV_STATION</h2></div>
+    </div>
+
+    <script>
+        const PASS = ["system", "matrix"];
+        let MY_YUBIKEY_ID = "8a6445c3a06dc1810538b2939600b65fc777985f"; // TU WKLEJ SWOJE ID
+        let step = 0, clicks = 0, fails = 0;
+        const input = document.getElementById('pass');
+        const fill = document.getElementById('main-fill');
+
+        window.onload = () => {
+            const lockTime = localStorage.getItem('FENIX_LOCKDOWN');
+            if(lockTime && Date.now() < lockTime) startLockdownCounter(lockTime);
+        };
+
+        function openReg() { if(++clicks >= 5) document.getElementById('reg-tool').style.display='block'; }
+
+        function activateAuth() {
+            if(localStorage.getItem('FENIX_LOCKDOWN') > Date.now()) return;
+            document.getElementById('beep-success').play();
+            document.getElementById('start-btn').style.display = 'none';
+            document.getElementById('input-area').style.display = 'block';
+            input.focus();
+            document.getElementById('status').innerText = "INPUT_PHASE_01";
+        }
+
+        input.onkeypress = (e) => {
+            if(e.key === 'Enter') {
+                if(input.value.toLowerCase() === PASS[step]) {
+                    step++; fails = 0;
+                    fill.style.width = (step/3*100) + "%"; input.value = "";
+                    document.getElementById('status').innerText = `INPUT_PHASE_0${step+1}`;
+                    if(step === 2) showYubico();
+                } else {
+                    handleFail();
+                }
+            }
+        };
+
+        function handleFail() {
+            fails++;
+            input.value = "";
+            let logs = JSON.parse(localStorage.getItem('FENIX_FAILED_LOGS') || "[]");
+            logs.push({ t: new Date().toLocaleString(), p: step+1 });
+            localStorage.setItem('FENIX_FAILED_LOGS', JSON.stringify(logs));
+
+            if(fails >= 3) {
+                const untill = Date.now() + 300000; // 5 min
+                localStorage.setItem('FENIX_LOCKDOWN', untill);
+                startLockdownCounter(untill);
+            } else {
+                document.getElementById('status').innerText = `DENIED: ATTEMPT ${fails}/3`;
+                document.getElementById('status').style.color = "red";
+                setTimeout(() => { document.getElementById('status').innerText = "INPUT_PHASE_REQUIRED"; document.getElementById('status').style.color = "var(--gold)"; }, 1000);
+            }
+        }
+
+        function startLockdownCounter(time) {
+            document.getElementById('input-area').style.display = 'none';
+            document.getElementById('l-box').classList.add('lockdown-active');
+            document.getElementById('alarm-lock').play();
+            const itv = setInterval(() => {
+                const rem = Math.round((time - Date.now()) / 1000);
+                if(rem <= 0) { clearInterval(itv); localStorage.removeItem('FENIX_LOCKDOWN'); location.reload(); }
+                document.getElementById('status').innerText = `LOCKDOWN: ${rem}s`;
+                document.getElementById('status').style.color = "red";
+            }, 1000);
+        }
+
+        function showYubico() {
+            document.getElementById('input-area').style.display = 'none';
+            document.getElementById('yubico-area').style.display = 'block';
+            document.getElementById('status').innerText = "AWAITING_YUBIKEY";
+            document.getElementById('status').style.color = "var(--blue)";
+        }
+
+        async function executeHardwareScan() {
+            const challenge = window.crypto.getRandomValues(new Uint8Array(32));
+            try {
+                const assertion = await navigator.credentials.get({ publicKey: { challenge, allowCredentials: MY_YUBIKEY_ID ? [{ id: Uint8Array.from(atob(MY_YUBIKEY_ID), c=>c.charCodeAt(0)), type: 'public-key' }] : [] } });
+                if(assertion) {
+                    const token = 'FX-' + Math.floor(Math.random()*9000+1000) + '-' + Math.random().toString(36).substring(2,5).toUpperCase() + '-2026';
+                    sessionStorage.setItem('FENIX_TOKEN', token);
+                    document.getElementById('beep-success').play();
+                    fill.style.width = "100%"; fill.style.background = "#00ff00";
+                    document.getElementById('status').innerText = "AUTH_GRANTED";
+                    setTimeout(() => { document.getElementById('login-screen').style.display='none'; document.getElementById('portal-screen').style.display='flex'; }, 1000);
+                }
+            } catch (e) { document.getElementById('status').innerText = "SCAN_ERROR"; }
+        }
+
+        async function registerKey() {
+            const challenge = window.crypto.getRandomValues(new Uint8Array(32));
+            try {
+                const cred = await navigator.credentials.create({ publicKey: { challenge, rp: { name: "Fenix" }, user: { id: Uint8Array.from("1", c=>c.charCodeAt(0)), name: "admin", displayName: "Admin" }, pubKeyCredParams: [{ alg: -7, type: "public-key" }], timeout: 60000 } });
+                document.getElementById('reg-log').innerText = "ID:\n" + btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
+            } catch (e) { alert("HTTPS required"); }
+        }
+
+        const c = document.getElementById('matrix-canvas'); const ctx = c.getContext('2d');
+        c.width = window.innerWidth; c.height = window.innerHeight;
+        const drops = Array(Math.floor(c.width/20)).fill(1);
+        setInterval(() => {
+            ctx.fillStyle = "rgba(0,0,0,0.05)"; ctx.fillRect(0,0,c.width,c.height);
+            ctx.fillStyle = "#FFD700"; drops.forEach((y,i) => {
+                ctx.fillText(Math.random()>0.5?"1":"0", i*20, y*20);
+                if(y*20 > c.height && Math.random() > 0.975) drops[i] = 0; drops[i]++;
+            });
+        }, 50);
+    </script>
+</body>
+</html>
